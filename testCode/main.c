@@ -5,37 +5,65 @@
  * Created on November 16, 2017, 5:49 PM
  */
 
+/*
+ Tosc = 1/Fosc
+Fcy = Fosc/4
+MIPS = Fcy/1000000
+Tcy = 1/Fcy
+Tcy = 4*Tosc
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 
 #include <xc.h>
 
-#define FCY 48000000
+#define FCY 12000000
 #define BRATE 9600
 #define _XTAL_FREQ 48000000
+
+#pragma config FWDTEN = OFF
+#pragma config POSCMD = HS
+#pragma config FNOSC = PRIPLL
+#pragma config ICS = PGD2
 
 void uart_init();
 void oscSetup();
 void T1_Setup();
+void UARTSend (char data);
 
-int counter = 0;
+int booleans = 0;
+volatile int counter = 0;
+
 void main(void) {
     char temp = 0b00000000;
-    
-    uart_init();
+    TRISBbits.TRISB9 = 0;
+    LATBbits.LATB9 = 1;
     oscSetup();
+    T1_Setup();
+    uart_init();
+    
     
     
     while (1){
-        if (counter == 4){
+        printf("test");
+        if (counter == 100){
             UARTSend(temp);
             temp = temp + 1;
             counter = 0;
-          
+            
             if (temp == 10){
                 temp = 0;
             }
-        }
+           
+            if(booleans == 1){
+                booleans = 0;
+            }else{
+                booleans = 1;
+            }
+            
+           LATBbits.LATB9 = booleans;
+        }  
     }
 }
 
@@ -69,35 +97,47 @@ void uart_init(){
 }
 void oscSetup(){   
     //Setting Up External Oscillator
-    OSCCONbits.COSC = 0b011;
+/*  
     OSCCONbits.NOSC = 0b011;
     OSCCONbits.IOLOCK = 0;
-    OSCCONbits.CLKLOCK = 1;
+    OSCCONbits.CLKLOCK = 0;
+  */  
     
     
+    PLLFBDbits.PLLDIV = 32; //M = 32
+    CLKDIVbits.PLLPOST = 1; // N2 = 4
     CLKDIVbits.PLLPRE = 0; //N1 = 2
-    CLKDIVbits.PLLPOST = 01; // N2 = 2
-    PLLFBDbits.PLLDIV = 0x20; //M = 32
 
+    // Clock switching to incorporate PLL
+    __builtin_write_OSCCONH(0x03);  // Initiate Clock Switch to Primary
+             // Oscillator with PLL (NOSC=0b011)
+    __builtin_write_OSCCONL(0x01);  // Start clock switching
+    while (OSCCONbits.COSC != 0b011); // Wait for Clock switch to occur
+    // Wait for PLL to lock
+    while(OSCCONbits.LOCK!=1);
 }
 
 void UARTSend (char data){
-     while(!U1STAbits.TRMT);  // hold the program till TX buffer is free
+
+    while(!U1STAbits.TRMT);  // hold the program till TX buffer is free
     U1TXREG = data; //Load the transmitter buffer with the received value
 }
 
 void T1_Setup(void){
-    T1CONbits.TON = 1;
+   
+    T1CON = 0;
     T1CONbits.TSIDL = 0;
-    T1CONbits.TCS = 1;
+    T1CONbits.TCS = 0;
     //T1CONbits.TSYNC = 1;
     T1CONbits.TCKPS = 0b11; // Prescaler set 1:256
     
-    PR1 = 0xB71B;
+    IEC0bits.T1IE = 1;
+    PR1 = 1875;
+    T1CONbits.TON = 1;
 }
 
-void __attribute__((interrupt, auto_psv)) T1Interrupt(void){
+void __attribute__((interrupt, auto_psv)) _T1Interrupt(void){
     
     counter = counter +1 ;
-    
+    IFS0bits.T1IF = 0;
 }
