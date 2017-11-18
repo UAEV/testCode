@@ -14,11 +14,12 @@ Tcy = 4*Tosc
  */
 
 #include <stdio.h>
-#include <stdlib.h>
-
 #include <xc.h>
+#include <p33FJ128GP804.h>
+#include <PPS.h>
+#include "PinDef.h"
 
-#define FCY 12000000
+#define FCY 24000000
 #define BRATE 9600
 #define _XTAL_FREQ 48000000
 
@@ -36,7 +37,8 @@ int booleans = 0;
 volatile int counter = 0;
 
 void main(void) {
-    char temp = 0b00000000;
+    char temp = 1;
+    RX2_Tris = 0;
     TRISBbits.TRISB9 = 0;
     LATBbits.LATB9 = 1;
     oscSetup();
@@ -46,8 +48,9 @@ void main(void) {
     
     
     while (1){
-        printf("test");
-        if (counter == 100){
+        if (counter == 50){
+            //printf("test");
+
             UARTSend(temp);
             temp = temp + 1;
             counter = 0;
@@ -66,35 +69,29 @@ void main(void) {
         }  
     }
 }
-
+//UxBRG=[Fcy/(16*Baud Rate)]-1.
 void uart_init(){
- 
-    int temp = ((FCY/BRATE)/16) - 1;
-    U1BRG = temp;
-    
-    // U1MODE Register settings
-    U2MODEbits.UARTEN = 1; //Enable UART1
-    U2MODEbits.USIDL = 0; //Continue during idle
-    U2MODEbits.IREN = 0; //IrDA encoder/decoder disable
-    U2MODEbits.RTSMD = 0; //U1RTS in flow control mode
-    U2MODEbits.UEN = 0b00; //U1TX and U1RX are enabled and used. UxCTS and UxRTS/BCLK pins controlled by port latches
-    U2MODEbits.WAKE = 0; //No wake-up enabled
-    U2MODEbits.LPBACK = 0;
-    U2MODEbits.ABAUD = 0;
-    U2MODEbits.URXINV = 0;
-    U2MODEbits.BRGH = 0; //16x baud clock
-    U2MODEbits.PDSEL = 0b00; //8bit data - no parity
-    U2MODEbits.STSEL = 0;
-    
-    U2STAbits.URXISEL = 0b00;   //Interrupt when a character is transferred to the Transmit Shift register (this implies there is at least one character open in the transmit buffer)
-    U2STAbits.UTXINV = 0;       //0 = UxTX Idle state is ?1?
-    U2STAbits.UTXBRK = 0;
-    U2STAbits.UTXEN = 1;    //Transmit enable bit
-    U2STAbits.URXISEL = 0b00;
-    U2STAbits.ADDEN = 0; //Address detect bit
-    U2STAbits.OERR = 0;  //Overrun Error Status Bit
-    
+
+    RPOR3bits.RP7R = 0x03;    // Make Pin RP8 U1TX
+    U1MODEbits.STSEL = 0; // 1-stop bit
+    U1MODEbits.PDSEL = 0; // No Parity, 8-data bits
+    U1MODEbits.ABAUD = 0; // Auto-Baud Disabled
+    U1MODEbits.BRGH = 0; // Low Speed mode
+    U1BRG = 155; // BAUD Rate Setting
+    U1STAbits.UTXISEL0 = 0; // Interrupt after one Tx character is transmitted
+    U1STAbits.UTXISEL1 = 0;
+    IEC0bits.U1TXIE = 0; // Disenable UART Tx interrupt
+    U1MODEbits.UARTEN = 1; // Enable UART
+    U1STAbits.UTXEN = 1; // Enable UART Tx
 }
+
+
+void UARTSend (char data){
+    U1TXREG = 54;
+    while(!U1STAbits.TRMT);
+  //  IFS1bits.U2TXIF = 0;
+}
+
 void oscSetup(){   
     //Setting Up External Oscillator
 /*  
@@ -104,7 +101,7 @@ void oscSetup(){
   */  
     
     
-    PLLFBDbits.PLLDIV = 32; //M = 32
+    PLLFBDbits.PLLDIV = 0b11110; //M = 32
     CLKDIVbits.PLLPOST = 1; // N2 = 4
     CLKDIVbits.PLLPRE = 0; //N1 = 2
 
@@ -115,12 +112,6 @@ void oscSetup(){
     while (OSCCONbits.COSC != 0b011); // Wait for Clock switch to occur
     // Wait for PLL to lock
     while(OSCCONbits.LOCK!=1);
-}
-
-void UARTSend (char data){
-
-    while(!U1STAbits.TRMT);  // hold the program till TX buffer is free
-    U1TXREG = data; //Load the transmitter buffer with the received value
 }
 
 void T1_Setup(void){
