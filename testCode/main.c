@@ -49,14 +49,14 @@ void main(void) {
     
     while (1){
         if (counter == 50){
-            //printf("test");
+            printf("Nick is a bitch \n");
 
-            UARTSend(temp);
+            //UARTSend(temp);
             temp = temp + 1;
             counter = 0;
             
-            if (temp == 10){
-                temp = 0;
+            if (temp == 11){
+                temp = 1;
             }
            
             if(booleans == 1){
@@ -72,13 +72,13 @@ void main(void) {
 //UxBRG=[Fcy/(16*Baud Rate)]-1.
 void uart_init(){
 
+    RPINR18 = 0x07;  //Make Pin RP7 U1RX
     RPOR3bits.RP7R = 0x03;    // Make Pin RP8 U1TX
     U1MODEbits.STSEL = 0; // 1-stop bit
     U1MODEbits.PDSEL = 0; // No Parity, 8-data bits
     U1MODEbits.ABAUD = 0; // Auto-Baud Disabled
     U1MODEbits.BRGH = 0; // Low Speed mode
     U1BRG = 155; // BAUD Rate Setting
-    U1STAbits.UTXISEL0 = 0; // Interrupt after one Tx character is transmitted
     U1STAbits.UTXISEL1 = 0;
     IEC0bits.U1TXIE = 0; // Disenable UART Tx interrupt
     U1MODEbits.UARTEN = 1; // Enable UART
@@ -87,7 +87,7 @@ void uart_init(){
 
 
 void UARTSend (char data){
-    U1TXREG = 54;
+    U1TXREG = data;
     while(!U1STAbits.TRMT);
   //  IFS1bits.U2TXIF = 0;
 }
